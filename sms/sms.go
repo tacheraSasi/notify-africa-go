@@ -37,9 +37,9 @@ type Payload struct {
 
 // SendResponse represents the API response
 type SendResponse struct {
-	Status  int         `json:"status"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
 }
 
 // SendSMS sends an SMS message to multiple recipients
