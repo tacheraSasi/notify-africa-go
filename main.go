@@ -1,1 +1,1 @@
-package notifyafricago
+package main
