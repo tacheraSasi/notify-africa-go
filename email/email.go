@@ -2,11 +2,11 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 )
 
 type (
@@ -21,16 +21,25 @@ type (
 		Body       string   `json:"body"`
 		Recipients []string `json:"recipients"`
 	}
+
+	Client struct {
+		BaseURL string
+		Token   string
+		client  *http.Client
+	}
 )
 
-// EmailEndpoint sends an email using notify.africa
-func EmailEndpoint(sender, subject, body string, recipients []string) error {
-	url := "https://api.notify.africa/v2/send-email"
-
-	apiKey := os.Getenv("EMAIL_APIKEY")
-	if apiKey == "" {
-		return fmt.Errorf("EMAIL_APIKEY environment variable is not set")
+func NewClient(baseURL, token string) *Client {
+	return &Client{
+		BaseURL: baseURL,
+		Token:   token,
+		client:  &http.Client{},
 	}
+}
+
+// SendEmailWithContext sends an email using notify.africa with context
+func (c *Client) SendEmailWithContext(ctx context.Context, sender, subject, body string, recipients []string) (*Respond, error) {
+	url := c.BaseURL + "/send-email"
 
 	payload := EmailPayload{
 		Sender:     sender,
@@ -41,31 +50,49 @@ func EmailEndpoint(sender, subject, body string, recipients []string) error {
 
 	bodyBytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	fmt.Printf("Status: %s\nResponse: %s\n", resp.Status, string(respBody))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(respBody))
+	}
 
-	return nil
+	var response Respond
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response JSON: %w", err)
+	}
+
+	return &response, nil
+}
+
+// EmailEndpoint is a backward-compatible function that uses context.Background()
+func (c *Client) SendEmail(sender, subject, body string, recipients []string) (*Respond, error) {
+	return c.SendEmailWithContext(context.Background(), sender, subject, body, recipients)
+}
+
+// For backward compatibility, keep the old EmailEndpoint function, but recommend using the client.
+func EmailEndpoint(sender, subject, body string, recipients []string) error {
+	client := NewClient("https://api.notify.africa/v2", "") // Token should be set via env or config
+	_, err := client.SendEmail(sender, subject, body, recipients)
+	return err
 }

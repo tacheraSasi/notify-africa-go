@@ -2,6 +2,7 @@ package sms
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,11 @@ import (
 )
 
 // Client represents the SMS API client
+// Now supports context for production readiness
 type Client struct {
 	BaseURL string
 	Token   string
+	client  *http.Client
 }
 
 // NewClient creates a new API client
@@ -19,6 +22,7 @@ func NewClient(baseURL, token string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		Token:   token,
+		client:  &http.Client{},
 	}
 }
 
@@ -37,20 +41,18 @@ type Payload struct {
 
 // SendResponse represents the API response
 type SendResponse struct {
-	Status  int    `json:"status"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
+	Status  int         `json:"status"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 
-// SendSMS sends an SMS message to multiple recipients
-func (c *Client) SendSMS(senderID int, message string, recipients []string) (*SendResponse, error) {
-	// Prepare recipients list
+// SendSMSWithContext sends an SMS message to multiple recipients with context
+func (c *Client) SendSMSWithContext(ctx context.Context, senderID int, message string, recipients []string) (*SendResponse, error) {
 	recipientList := make([]Recipient, len(recipients))
 	for i, num := range recipients {
 		recipientList[i] = Recipient{Number: num}
 	}
 
-	// Create payload
 	payload := Payload{
 		SenderID:   senderID,
 		Schedule:   "none",
@@ -58,48 +60,45 @@ func (c *Client) SendSMS(senderID int, message string, recipients []string) (*Se
 		Recipients: recipientList,
 	}
 
-	// Marshal payload to JSON
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling payload: %w", err)
 	}
 
-	// Create request
 	url := fmt.Sprintf("%s/send-sms", c.BaseURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
 
-	// Send request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("API request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	// Check for non-success status
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(body))
 	}
 
-	// Parse response
 	var response SendResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response JSON: %w", err)
 	}
 
 	return &response, nil
+}
+
+// SendSMS is a backward-compatible method that uses context.Background()
+func (c *Client) SendSMS(senderID int, message string, recipients []string) (*SendResponse, error) {
+	return c.SendSMSWithContext(context.Background(), senderID, message, recipients)
 }
