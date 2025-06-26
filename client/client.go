@@ -17,8 +17,14 @@ type Config struct {
 }
 
 func NewClient(cfg Config) *Client {
+	smsClient := sms.NewClient(cfg.SMSApiKey)
+	emailClient := email.NewClient(cfg.EmailApiKey)
+	if cfg.BaseURL != "" {
+		smsClient.SetBaseURL(cfg.BaseURL)
+		emailClient.SetBaseURL(cfg.BaseURL)
+	}
 	return &Client{
-		SMS:   sms.NewClient(cfg.BaseURL, cfg.SMSApiKey),
-		Email: email.NewClient(cfg.BaseURL, cfg.EmailApiKey),
+		SMS:   smsClient,
+		Email: emailClient,
 	}
 }

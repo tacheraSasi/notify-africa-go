@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 type (
@@ -29,11 +30,20 @@ type (
 	}
 )
 
-func NewClient(baseURL, token string) *Client {
+const defaultBaseURL = "https://api.notify.africa/v2"
+
+func NewClient(token string) *Client {
 	return &Client{
-		BaseURL: baseURL,
+		BaseURL: defaultBaseURL,
 		Token:   token,
 		client:  &http.Client{},
+	}
+}
+
+// SetBaseURL allows overriding the default BaseURL
+func (c *Client) SetBaseURL(baseURL string) {
+	if baseURL != "" {
+		c.BaseURL = baseURL
 	}
 }
 
@@ -92,7 +102,8 @@ func (c *Client) SendEmail(sender, subject, body string, recipients []string) (*
 
 // For backward compatibility, keep the old EmailEndpoint function, but recommend using the client.
 func EmailEndpoint(sender, subject, body string, recipients []string) error {
-	client := NewClient("https://api.notify.africa/v2", "") // Token should be set via env or config
+	token := os.Getenv("EMAIL_APIKEY")
+	client := NewClient(token)
 	_, err := client.SendEmail(sender, subject, body, recipients)
 	return err
 }

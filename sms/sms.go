@@ -9,6 +9,8 @@ import (
 	"net/http"
 )
 
+const defaultBaseURL = "https://api.notify.africa/v2"
+
 // Client represents the SMS API client
 // Now supports context for production readiness
 type Client struct {
@@ -18,11 +20,18 @@ type Client struct {
 }
 
 // NewClient creates a new API client
-func NewClient(baseURL, token string) *Client {
+func NewClient(token string) *Client {
 	return &Client{
-		BaseURL: baseURL,
+		BaseURL: defaultBaseURL,
 		Token:   token,
 		client:  &http.Client{},
+	}
+}
+
+// SetBaseURL allows overriding the default BaseURL
+func (c *Client) SetBaseURL(baseURL string) {
+	if baseURL != "" {
+		c.BaseURL = baseURL
 	}
 }
 
