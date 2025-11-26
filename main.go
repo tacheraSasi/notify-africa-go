@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
-	"context"
 	"time"
 
 	"github.com/tacherasasi/notify-africa-go/client"
@@ -21,14 +21,19 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Send SMS
-	smsResp, err := c.SMS.SendSMSWithContext(ctx, 1, "Hello from Notify Africa!", []string{"2557654321"})
-	if err != nil {
-		log.Fatalf("SMS error: %v", err)
+	// Send test SMS to 255686477074 using batch endpoint
+	smsURL := os.Getenv("SMS_URL")
+	smsSenderID := os.Getenv("SMS_SENDER_ID")
+	if smsURL != "" {
+		c.SMS.SetBaseURL(smsURL[:len(smsURL)-len("/api/v1/api/messages/batch")]) // Remove endpoint, keep base
 	}
-	log.Printf("SMS sent! Status: %d, Message: %s", smsResp.Status, smsResp.Message)
+	batchResp, err := c.SMS.SendBatchSMS(ctx, []string{"255686477074"}, "Test SMS from Notify Africa Go!", smsSenderID)
+	if err != nil {
+		log.Fatalf("Test SMS error: %v", err)
+	}
+	log.Printf("Test SMS sent! Status: %d, Message: %s, Count: %d, Credits: %d, Balance: %d", batchResp.Status, batchResp.Message, batchResp.Data.MessageCount, batchResp.Data.CreditsDeducted, batchResp.Data.RemainingBalance)
 
-	// Send Email
+	// Send Email (unchanged)
 	emailResp, err := c.Email.SendEmailWithContext(ctx, "noreply@yourdomain.com", "Subject", "Body text", []string{"user@example.com"})
 	if err != nil {
 		log.Fatalf("Email error: %v", err)
