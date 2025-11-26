@@ -10,26 +10,27 @@ go get github.com/tacherasasi/notify-africa-go
 
 ## Environment Variables
 
-Set your API keys as environment variables:
+Set your API keys and sender ID as environment variables:
 
 ```
 export SMS_APIKEY=your_sms_api_key
+export SMS_SENDER_ID=your_sender_id
+export SMS_URL=https://api.notify.africa/api/v1/api/messages/batch
 export EMAIL_APIKEY=your_email_api_key
 ```
 
 ## Usage
 
-### Unified Client Example
+### Send Test SMS Example
 
 ```go
 package main
 
 import (
+	"context"
 	"log"
 	"os"
-	"context"
 	"time"
-
 	"github.com/tacherasasi/notify-africa-go/client"
 )
 
@@ -37,27 +38,25 @@ func main() {
 	cfg := client.Config{
 		SMSApiKey:   os.Getenv("SMS_APIKEY"),
 		EmailApiKey: os.Getenv("EMAIL_APIKEY"),
-		// Optionally override BaseURL:
-		// BaseURL: "https://custom.url/v2",
 	}
 	c := client.NewClient(cfg)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Send SMS
-	smsResp, err := c.SMS.SendSMSWithContext(ctx, 1, "Hello from Notify Africa!", []string{"2557654321"})
-	if err != nil {
-		log.Fatalf("SMS error: %v", err)
+	// Optionally override SMS base URL from env
+	smsURL := os.Getenv("SMS_URL")
+	if smsURL != "" {
+		c.SMS.SetBaseURL(smsURL[:len(smsURL)-len("/api/v1/api/messages/batch")])
 	}
-	log.Printf("SMS sent! Status: %d, Message: %s", smsResp.Status, smsResp.Message)
 
-	// Send Email
-	emailResp, err := c.Email.SendEmailWithContext(ctx, "noreply@yourdomain.com", "Subject", "Body text", []string{"user@example.com"})
+	// Send test SMS to 255686477074
+	senderID := os.Getenv("SMS_SENDER_ID")
+	batchResp, err := c.SMS.SendBatchSMS(ctx, []string{"255686477074"}, "Test SMS from Notify Africa Go!", senderID)
 	if err != nil {
-		log.Fatalf("Email error: %v", err)
+		log.Fatalf("Test SMS error: %v", err)
 	}
-	log.Printf("Email sent! Message: %s, Success: %v", emailResp.Message, emailResp.Success)
+	log.Printf("Test SMS sent! Status: %d, Message: %s, Count: %d, Credits: %d, Balance: %d", batchResp.Status, batchResp.Message, batchResp.Data.MessageCount, batchResp.Data.CreditsDeducted, batchResp.Data.RemainingBalance)
 }
 ```
 
@@ -70,13 +69,14 @@ import (
 )
 
 smsClient := sms.NewClient(os.Getenv("SMS_APIKEY"))
-smsClient.SetBaseURL("https://custom.url/v2") // Optional
+smsClient.SetBaseURL("https://api.notify.africa") // Optional
 // ...
 
 emailClient := email.NewClient(os.Getenv("EMAIL_APIKEY"))
-emailClient.SetBaseURL("https://custom.url/v2") // Optional
+emailClient.SetBaseURL("https://api.notify.africa/v2") // Optional
 // ...
 ```
 
 ## License
+
 MIT
