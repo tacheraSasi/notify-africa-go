@@ -21,26 +21,17 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Send a single SMS
-	singleResp, err := c.SMS.SendSingleSMS(ctx, "2557654321", "Hello from Notify Africa!", "137")
-	if err != nil {
-		log.Fatalf("Single SMS error: %v", err)
+	// Send test SMS to 255686477074 using batch endpoint
+	smsURL := os.Getenv("SMS_URL")
+	smsSenderID := os.Getenv("SMS_SENDER_ID")
+	if smsURL != "" {
+		c.SMS.SetBaseURL(smsURL[:len(smsURL)-len("/api/v1/api/messages/batch")]) // Remove endpoint, keep base
 	}
-	log.Printf("Single SMS sent! Status: %d, Message: %s, MessageID: %s", singleResp.Status, singleResp.Message, singleResp.Data.MessageID)
-
-	// Send batch SMS
-	batchResp, err := c.SMS.SendBatchSMS(ctx, []string{"255763765548", "255689737839"}, "Batch test message", "137")
+	batchResp, err := c.SMS.SendBatchSMS(ctx, []string{"255686477074"}, "Test SMS from Notify Africa Go!", smsSenderID)
 	if err != nil {
-		log.Fatalf("Batch SMS error: %v", err)
+		log.Fatalf("Test SMS error: %v", err)
 	}
-	log.Printf("Batch SMS sent! Status: %d, Message: %s, Count: %d, Credits: %d, Balance: %d", batchResp.Status, batchResp.Message, batchResp.Data.MessageCount, batchResp.Data.CreditsDeducted, batchResp.Data.RemainingBalance)
-
-	// Check message status (using the MessageID from singleResp)
-	statusResp, err := c.SMS.CheckMessageStatus(ctx, singleResp.Data.MessageID)
-	if err != nil {
-		log.Fatalf("Check status error: %v", err)
-	}
-	log.Printf("Message Status: %s, DeliveredAt: %v", statusResp.Data.Status, statusResp.Data.DeliveredAt)
+	log.Printf("Test SMS sent! Status: %d, Message: %s, Count: %d, Credits: %d, Balance: %d", batchResp.Status, batchResp.Message, batchResp.Data.MessageCount, batchResp.Data.CreditsDeducted, batchResp.Data.RemainingBalance)
 
 	// Send Email (unchanged)
 	emailResp, err := c.Email.SendEmailWithContext(ctx, "noreply@yourdomain.com", "Subject", "Body text", []string{"user@example.com"})
